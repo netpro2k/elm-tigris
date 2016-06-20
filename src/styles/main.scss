@@ -1,0 +1,54 @@
+html {
+  box-sizing: border-box;
+}
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
+$spaceSize: 50px;
+
+.hand {
+  border: 1px solid black;
+  margin-top: 10px;
+  display: flex;
+}
+
+.board {
+  border: 1px solid black;
+  display: flex;
+  flex-wrap: wrap;
+  width: ($spaceSize ) * 16 + 2;
+}
+
+.space {
+  width: $spaceSize;
+  height: $spaceSize;
+  border: 1px solid rgba(0,0,0,0.1);
+  cursor: pointer;
+  &.regular {
+    background: tan;
+  }
+  &.water {
+    background: lightblue;
+  }
+  &.selected {
+    border: 5px solid lightyellow;
+  }
+}
+
+.tile {
+  width: 100%;
+  height: 100%;
+  &.red {
+    background: red;
+  }
+  &.blue {
+    background: blue;
+  }
+  &.green {
+    background: green;
+  }
+  &.black {
+    background: black;
+  }
+}
