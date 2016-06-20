@@ -3,4 +3,4 @@ require( './styles/main.scss' );
 
 // inject bundled Elm app into div#main
 var Elm = require( './main' );
-Elm.Tigris.embed( document.getElementById( 'main' ) );
+Elm.Main.embed( document.getElementById( 'main' ) );
