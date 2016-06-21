@@ -8,6 +8,8 @@ import String as String
 import Array
 import Board exposing (..)
 import Maybe exposing (andThen)
+import Random
+import Random.Array
 
 
 main : Program Never
@@ -34,7 +36,6 @@ type alias Model =
     { bag : List Tile
     , board : Board
     , players : List Player
-    , activeDynasty : Dynasty
     }
 
 
@@ -52,14 +53,23 @@ defaultModel =
 
         blueTiles =
             List.map (Tile Blue) [0..36]
+
+        allTiles =
+            List.concat [ redTiles, greenTiles, blackTiles, blueTiles ]
+
+        randomTiles =
+            let
+                ( tiles, _ ) =
+                    Random.step (Random.Array.shuffle (Array.fromList allTiles)) (Random.initialSeed 42)
+            in
+                Array.toList tiles
     in
-        { bag = List.concat [ redTiles, greenTiles, blackTiles, blueTiles ]
+        { bag = (List.drop 12 randomTiles)
         , board = defaultBoard
         , players =
-            [ (Player Archer [] Nothing)
-            , (Player Bull [] Nothing)
+            [ (Player Archer (List.take 6 randomTiles) Nothing)
+            , (Player Bull (List.take 6 (List.drop 6 randomTiles)) Nothing)
             ]
-        , activeDynasty = Archer
         }
 
 
@@ -77,12 +87,17 @@ type Msg
 
 isActivePlayer : Model -> Player -> Bool
 isActivePlayer model player =
-    player.dynasty == model.activeDynasty
+    (getActivePlayer model) == player
 
 
-getActivePlayer : Model -> Maybe Player
+getActivePlayer : Model -> Player
 getActivePlayer model =
-    (List.head (List.filter (isActivePlayer model) model.players))
+    case (List.head model.players) of
+        Just player ->
+            player
+
+        Nothing ->
+            Debug.crash "Somehow no active player"
 
 
 update : Msg -> Model -> Model
@@ -92,7 +107,23 @@ update msg model =
             model
 
         EndTurn ->
-            model
+            let
+                player =
+                    getActivePlayer model
+
+                neededTiles =
+                    6 - (List.length player.hand)
+
+                ( hand', bag' ) =
+                    ( player.hand ++ List.take neededTiles model.bag, List.drop neededTiles model.bag )
+
+                player' =
+                    { player | hand = hand' }
+            in
+                { model
+                    | players = ((List.drop 1 model.players) ++ [ player' ])
+                    , bag = bag'
+                }
 
         DrawTile tile ->
             let
@@ -108,7 +139,7 @@ update msg model =
                 { model | players = players', bag = bag' }
 
         PlaceTile loc ->
-            case (getActivePlayer model) `andThen` .selectedTile of
+            case (getActivePlayer model).selectedTile of
                 Just selectedTile ->
                     if isValidMove model.board loc selectedTile then
                         let
