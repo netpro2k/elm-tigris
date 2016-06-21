@@ -7,6 +7,7 @@ import Html.Events exposing (..)
 import String as String
 import Array
 import Board exposing (..)
+import Maybe exposing (andThen)
 
 
 main : Program Never
@@ -33,6 +34,7 @@ type alias Model =
     { bag : List Tile
     , board : Board
     , players : List Player
+    , activeDynasty : Dynasty
     }
 
 
@@ -57,6 +59,7 @@ defaultModel =
             [ (Player Archer [] Nothing)
             , (Player Bull [] Nothing)
             ]
+        , activeDynasty = Archer
         }
 
 
@@ -72,9 +75,14 @@ type Msg
     | EndTurn
 
 
+isActivePlayer : Model -> Player -> Bool
+isActivePlayer model player =
+    player.dynasty == model.activeDynasty
+
+
 getActivePlayer : Model -> Maybe Player
 getActivePlayer model =
-    (List.head model.players)
+    (List.head (List.filter (isActivePlayer model) model.players))
 
 
 update : Msg -> Model -> Model
@@ -91,53 +99,53 @@ update msg model =
                 ( drawnTiles, bag' ) =
                     List.partition ((==) tile) model.bag
 
-                activePlayer =
-                    getActivePlayer model
-
-                updatePlayer i player =
-                    if i == 0 then
-                        { player | hand = (List.append player.hand drawnTiles) }
-                    else
-                        player
+                updatePlayer player =
+                    { player | hand = (List.append player.hand drawnTiles) }
 
                 players' =
-                    List.indexedMap updatePlayer model.players
+                    ifMap (isActivePlayer model) updatePlayer model.players
             in
                 { model | players = players', bag = bag' }
 
         PlaceTile loc ->
-            case ( (getActivePlayer model), (getActivePlayer model) `Maybe.andThen` .selectedTile ) of
-                ( Just activePlayer, Just selectedTile ) ->
-                    let
-                        hand' =
-                            List.filter ((/=) selectedTile) activePlayer.hand
-
-                        updatePlayer player =
-                            if player == activePlayer then
-                                { player | selectedTile = Nothing, hand = hand' }
-                            else
-                                player
-                    in
-                        if isValidMove model.board loc selectedTile then
+            case (getActivePlayer model) `andThen` .selectedTile of
+                Just selectedTile ->
+                    if isValidMove model.board loc selectedTile then
+                        let
+                            updatePlayer player =
+                                { player
+                                    | selectedTile = Nothing
+                                    , hand = List.filter ((/=) selectedTile) player.hand
+                                }
+                        in
                             { model
                                 | board = (placeTile model.board loc selectedTile)
-                                , players = (List.map updatePlayer model.players)
+                                , players = (ifMap (isActivePlayer model) updatePlayer model.players)
                             }
-                        else
-                            model
+                    else
+                        model
 
-                ( _, _ ) ->
+                Nothing ->
                     model
 
         SelectTile player tile ->
             let
                 selectTiles p =
-                    if p == player then
-                        { p | selectedTile = tile }
-                    else
-                        p
+                    { p | selectedTile = tile }
             in
-                { model | players = List.map selectTiles model.players }
+                { model | players = ifMap ((==) player) selectTiles model.players }
+
+
+ifMap : (a -> Bool) -> (a -> a) -> List a -> List a
+ifMap predicate update list =
+    let
+        f item =
+            if (predicate item) then
+                (update item)
+            else
+                item
+    in
+        List.map f list
 
 
 placeTile : Board -> Int -> Tile -> Board
